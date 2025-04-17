@@ -13,6 +13,7 @@ const unsigned int PX_WIDTH = 64;
 class Chip8 {
  public:
   Chip8();
+  void Cycle();
   void LoadROM(char const *filename);
 
   uint8_t keypad[KEY_COUNT]{};
@@ -31,9 +32,9 @@ class Chip8 {
   void OP_00E0();
 
   // 00EE: RET (Return from a subroutine).
-  // The top of the stack has the address of one instruction past the one that called the subroutine,
-  // so we can put that back into the PC.
-  // Note that this overwrites our preemptive pc += 2 earlier.
+  // The top of the stack has the address of one instruction past the one that
+  // called the subroutine, so we can put that back into the PC. Note that this
+  // overwrites our preemptive pc += 2 earlier.
   void OP_00EE();
 
   // 1nnn: JP addr (Jump to location nnn).
@@ -121,8 +122,8 @@ class Chip8 {
   void OP_Cxkk();
 
   // Dxyn: DRW Vx, Vy, nibble.
-  // Draws an N-byte sprite from memory (at I(Index)) onto the screen at (Vx, Vy).
-  // VF = 1 if pixels collide.
+  // Draws an N-byte sprite from memory (at I(Index)) onto the screen at (Vx,
+  // Vy). VF = 1 if pixels collide.
   void OP_Dxyn();
 
   // Ex9E: SKP Vx.
@@ -169,8 +170,8 @@ class Chip8 {
   // Loads V0 to Vx from memory starting at I.
   void OP_Fx65();
 
-
   // 16x 8-bit registers, from V0 to VF, holds 0x00 to 0xFF.
+  // Denoted as Vx in comments.
   uint8_t registers[REGISTER_COUNT]{};
 
   // Address space from 0x000 to 0xFFF.
@@ -179,11 +180,13 @@ class Chip8 {
   uint8_t memory[MEM_SIZE]{};
 
   // Index register. Store memory address for use in operations
-  // 16-bit due to the max memory address (0xFFF) is too big for an 8-bit register.
+  // 16-bit due to the max memory address (0xFFF) is too big for an 8-bit
+  // register.
   uint16_t index{};
 
   // 16-bit Program Counter (PC)
-  // Starts at 0x200, for CPU to keep track of which instruction to execute next.
+  // Starts at 0x200, for CPU to keep track of which instruction to execute
+  // next.
   uint16_t pc{};
 
   // Stack order of execution.
@@ -196,7 +199,8 @@ class Chip8 {
 
   // The CHIP-8 has a simple timer used for timing.
   // If the timer value is zero, it stays zero.
-  // If it is loaded with a value, it will decrement at a rate of 60Hz (or whatever rate the cycle clock set to).
+  // If it is loaded with a value, it will decrement at a rate of 60Hz (or
+  // whatever rate the cycle clock set to).
   uint8_t delayTimer{};
 
   uint8_t soundTimer{};
