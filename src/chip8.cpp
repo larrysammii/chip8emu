@@ -139,7 +139,6 @@ void Chip8::OP_2nnn() {
 // If true, jump forward an extra 2 bytes (total pc += 4).
 // If false, move to the next instruction (pc += 2).
 //
-
 void Chip8::OP_3xkk() {
   // Example:
   // Instruction: 0x3A45 (3xkk where x = A, kk = 0x45).
@@ -432,26 +431,231 @@ void Chip8::OP_Cxkk() {
   registers[x] = random & kk;
 }
 
-void Chip8::OP_Dxyn() {}
+// Display n-byte sprite starting at memory location I at (Vx, Vy), set VF =
+// collision.
+//
+// We iterate over the sprite, row by row and column by column. We know there
+// are eight columns because a sprite is guaranteed to be eight pixels wide.
+//
+// If a sprite pixel is on then there may be a collision with what’s already
+// being displayed, so we check if our screen pixel in the same location is set.
+// If so we must set the VF register to express collision.
+//
+// Then we can just XOR the screen pixel with 0xFFFFFFFF to essentially XOR it
+// with the sprite pixel (which we now know is on). We can’t XOR directly
+// because the sprite pixel is either 1 or 0 while our video pixel is either
+// 0x00000000 or 0xFFFFFFFF.
+void Chip8::OP_Dxyn() {
+  uint8_t x = (opcode & 0x0F00u) >> 8u;  // bits 8-11
+  uint8_t y = (opcode & 0x00F0u) >> 4u;  // bits 4-7
+  uint8_t height = opcode & 0x000Fu;     // bits 0-3
 
-void Chip8::OP_Ex9E() {}
+  // (0 to 255, but only 0-63 matters for 64-wide screen).
+  uint8_t x_cord = registers[x] % PX_WIDTH;
+  // (or x_coord & 0x3F) to stay in 0-63.
 
-void Chip8::OP_ExA1() {}
+  // (0 to 255, 0-31 for 32-high screen).
+  uint8_t y_cord = registers[y] % PX_HEIGHT;
+  // (or y_coord & 0x1F) to stay in 0-31.
 
-void Chip8::OP_Fx07() {}
+  // What it does: Clears the collision flag (VF, register 15) before drawing.
+  // Purpose: VF will be set to 1 if any pixel flips from on (0xFFFFFFFF) to off
+  // (0x00000000).
+  registers[0xFu] = 0;
 
-void Chip8::OP_Fx0A() {}
+  // Analogy: Think of drawing a sprite as painting a grid on a canvas:
+  // The sprite is a stencil with n rows, each 8 holes wide (bits).
+  // You paint row-by-row, checking each hole (bit) to decide if you apply XOR
+  // paint at the canvas position (Vx + bit, Vy + row).
+  for (unsigned int row = 0; row < height; row++) {
+    // Processes each row of the sprite,
+    // stored in memory[I] to memory[I + n - 1].
+    uint8_t spriteByte = memory[index + row];
+    for (unsigned int col = 0; col < 8; col++) {
+      // Bit Check: spritePx = spriteByte & (0x80u >> col);
+      // 0x80u = 10000000 (MSB set).
+      // 0x80u >> col: Shifts the 1 right (e.g., col = 0: 10000000, col = 1:
+      // 01000000, ..., col = 7: 00000001). spriteByte & (0x80u >> col): Tests
+      // if the col-th bit is 1 (non-zero if bit is 1, zero if bit is 0).
 
-void Chip8::OP_Fx15() {}
+      // Example: For spriteByte = 0xF0 (11110000):
+      // col = 0: 0xF0 & 0x80 = 11110000 & 10000000 = 10000000 (non-zero, bit 0
+      // = 1). col = 1: 0xF0 & 0x40 = 11110000 & 01000000 = 01000000 (non-zero,
+      // bit 1 = 1). col = 4: 0xF0 & 0x08 = 11110000 & 00001000 = 00000000
+      // (zero, bit 4 = 0).
+      uint8_t spritePx = spriteByte & (0x0080u >> col);
 
-void Chip8::OP_Fx18() {}
+      // ================== Setting individual pixel =========================
+      // Screen Position: uint32_t* screenPixel = &video[(yPos + row) *
+      // VIDEO_WIDTH + (xPos + col)];
 
-void Chip8::OP_Fx1E() {}
+      // Calculates the video array index for pixel (xPos + col, yPos + row).
+      // VIDEO_WIDTH = 64.
+      // Formula: y * 64 + x maps 2D to 1D.
+      // Example: For xPos = 10, yPos = 5, row = 0, col = 0:
+      // x = 10 + 0 = 10, y = 5 + 0 = 5.
+      // video[5 * 64 + 10] = video[330].
+      // Uses a pointer (uint32_t*) to directly access and modify video[idx].
 
-void Chip8::OP_Fx29() {}
+      // Purpose: Checks each bit of the byte to decide if a pixel needs
+      // drawing, and computes the screen position.
 
-void Chip8::OP_Fx33() {}
+      // Analogy: For each row’s stencil, check 8 holes (bits). If a hole is
+      // open (bit = 1), paint at the corresponding canvas spot.
 
-void Chip8::OP_Fx55() {}
+      // (yPos + row): The y-coordinate on the screen (row of the sprite).
 
-void Chip8::OP_Fx65() {}
+      // (yPos + row) * VIDEO_WIDTH: Converts the y-coordinate to the start of
+      // the screen row in the 1D array (e.g., y=5 → 5 * 64 = 320).
+
+      // (xPos + col): The x-coordinate on the screen (column of the sprite).
+
+      // (yPos + row) * VIDEO_WIDTH + (xPos + col): The index in video for pixel
+      // (xPos + col, yPos + row).
+
+      // The &: &video[idx] returns a pointer (uint32_t*) to the pixel’s memory
+      // location, allowing direct modification (e.g., *screenPixel ^=
+      // 0xFFFFFFFF).
+      uint32_t *screenPx = &video[(y_cord + row) * PX_WIDTH + (x_cord + col)];
+
+      // check sprite pixel is on/off
+      //
+      // What it does:
+      // If the sprite bit is 1 (spritePixel non-zero),
+      // XOR the screen pixel and check for collision.
+      // Collision:
+      // If video[idx] = 0xFFFFFFFF (on) and
+      // XOR will turn it off (0xFFFFFFFF ^ 0xFFFFFFFF = 0),
+      // set VF = 1.
+      // XOR: *screenPixel ^= 0xFFFFFFFF flips the pixel (on to off, off to on).
+      if (spritePx) {
+        // check collision and if screen pixel is also on
+        if (*screenPx == 0xFFFFFFFFu) {
+          registers[0xFu] = 1;
+        }
+
+        *screenPx ^= 0xFFFFFFFFu;
+      }
+    }
+  }
+}
+
+// Skip next instruction if key with the value of Vx is pressed.
+void Chip8::OP_Ex9E() {
+  uint8_t x = (opcode * 0x0F00u) >> 8u;
+  uint8_t key = registers[x];
+  // if pressed
+  if (keypad[key]) {
+    pc += 2;
+  }
+}
+
+// Skip next instruction if key with the value of Vx is not pressed.
+void Chip8::OP_ExA1() {
+  uint8_t x = (opcode & 0x0F00u) >> 8u;
+  uint8_t key = registers[x];
+  if (!keypad[key]) {
+    pc += 2;
+  }
+}
+
+// Set Vx = delay timer value.
+void Chip8::OP_Fx07() {
+  uint8_t x = (opcode & 0x0F00u) >> 8u;
+  registers[x] = delayTimer;
+}
+
+// Wait for a key press, store the value of the key in Vx.
+//
+// The easiest way to “wait” is to decrement the PC by 2 whenever a keypad value
+// is not detected. This has the effect of running the same instruction
+// repeatedly.
+void Chip8::OP_Fx0A() {
+  uint8_t x = (opcode & 0x0F00u) >> 8u;
+  // uint8_t key = registers[x];
+  for (uint8_t i = 0; i < 16; i++) {
+    if (keypad[i]) {
+      registers[x] = i;
+      pc += 2;
+      break;
+    }
+    pc -= 2;
+  }
+}
+
+// Set delay timer = Vx.
+void Chip8::OP_Fx15() {
+  uint8_t x = (opcode & 0x0F00u) >> 8u;
+  delayTimer = registers[x];
+}
+
+// Set sound timer = Vx.
+void Chip8::OP_Fx18() {
+  uint8_t x = (opcode & 0x0F00u) >> 8u;
+  soundTimer = registers[x];
+}
+
+// Set I = I + Vx.
+void Chip8::OP_Fx1E() {
+  uint8_t x = (opcode & 0x0F00u) >> 8u;
+  index += registers[x];
+}
+
+// Set I = location of sprite for digit Vx.
+// We know the font characters are located at 0x50,
+// and we know they’re five bytes each,
+// so we can get the address of the first byte of any character
+// by taking an offset from the start address.
+void Chip8::OP_Fx29() {
+  uint8_t x = (opcode & 0x0F00u) >> 8u;
+  uint8_t digit = registers[x];
+
+  index = FONTSET_START_ADDRESS + (5 * digit);
+}
+
+// Store BCD(binary-coded decimal) representation of Vx
+// in memory locations I, I+1, and I+2.
+//
+// The interpreter takes the decimal value of Vx, and places the hundreds digit
+// in memory at location in I, the tens digit at location I+1, and the ones
+// digit at location I+2.
+//
+// We can use the modulus operator to get the right-most digit of a number, and
+// then do a division to remove that digit. A division by ten will either
+// completely remove the digit (340 / 10 = 34), or result in a float which will
+// be truncated (345 / 10 = 34.5 = 34).
+void Chip8::OP_Fx33() {
+  uint8_t x = (opcode & 0x0F00u) >> 8u;
+
+  // read Vx
+  uint8_t value = registers[x];
+
+  // Ones
+  memory[index + 2] = value % 10;
+  value /= 10;
+
+  // Tens
+  memory[index + 1] = value % 10;
+  value /= 10;
+
+  // Hundreds
+  memory[index] = value % 10;
+}
+
+// Store registers V0 through Vx in memory starting at location I.
+void Chip8::OP_Fx55() {
+  uint8_t x = (opcode & 0x0F00u) >> 8u;
+
+  for (uint8_t i = 0; i <= registers[x]; i++) {
+    memory[index + i] = registers[i];
+  }
+}
+
+// Read registers V0 through Vx from memory starting at location I.
+void Chip8::OP_Fx65() {
+  uint8_t x = (opcode & 0x0F00u) >> 8u;
+
+  for (uint8_t i = 0; i <= registers[x]; i++) {
+    registers[i] = memory[index + i];
+  }
+}
