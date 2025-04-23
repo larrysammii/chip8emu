@@ -20,6 +20,47 @@ class Chip8 {
   uint32_t video[PX_WIDTH * PX_HEIGHT]{};
 
  private:
+  // Function Pointer Table instead of switch statements.
+
+  // These 4 are dispatch functions,
+  // for selecting appropriate opcode handler function from their subtables,
+  // namely table0, table8, tableE, tableF based on part of the opcode.
+  void Table0();
+  void Table8();
+  void TableE();
+  void TableF();
+
+  typedef void (Chip8::*Chip8Func)();
+  // 16 units array
+  // from instructions that starts with $0 to $F(inclusive so +1).
+  Chip8Func table[0xF + 1];
+
+  // 15 units array.
+  // for $00E0 & $00EE, only the fourth digit is unique,
+  // therefore, 0x000E + 1 (inclusive of $00EE).
+  Chip8Func table0[0xE + 1];
+
+  // 15 units array.
+  // for those starts with $8xy, only the fourth digit is unique,
+  // same principle as above, instructions goes to $8xyE.
+  // therefore, 0x000E + 1 (inclusive of $8xyE).
+  Chip8Func table8[0xE + 1];
+
+  // 15 units array.
+  // for $Exa1 & $Ex9E, although last 2 digits are different,
+  // these are the only 2 instructions that need to be dealt with.
+  // So a table from 0x0 to 0xE + 1 is enough.
+  Chip8Func tableE[0xE + 1];
+
+  // 106 units array.
+  // for those that start with $F and last 2 digits are unique.
+  // $Fx goes from $Fx07 to $Fx65.
+  // For the ease of indexing, the array size should be 0x00 to 0x65(inclusive).
+  Chip8Func tableF[0x65 + 1];
+
+  // In the case of invalid opcodes are called (opcodes that don't exist),
+  // it calls OP_NULL.
+
   // =====================================
   // ========== Instruction Set ==========
   // =====================================
@@ -205,7 +246,7 @@ class Chip8 {
 
   uint8_t soundTimer{};
 
-  uint16_t opcode;
+  uint16_t opcode{};
 
   // Random Number Generation
   std::default_random_engine randGen;
