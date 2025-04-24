@@ -136,6 +136,31 @@ void Chip8::Cycle() {
 
   // Increment PC before any further instructions.
   pc += 2;
+
+  // Decode and Execute:
+  // (opcode & 0xF000u) >> 12u: Gets the index (0 to 15).
+  // table[index]: Retrieves the function pointer (e.g., &Chip8::OP_1nnn).
+  // this->*: Applies the function pointer to the current Chip8 instance.
+  // (): Calls the function.
+  (this->*(table[(opcode & 0xF000u) >> 12u]))();
+
+  // Chip-8 has two timers: delayTimer and soundTimer, both 8-bit values that
+  // decrement at 60 Hz when non-zero. In an emulator, the Cycle() function
+  // might run faster or slower than 60 Hz, but a simple approach is to
+  // decrement them once per cycle and assume the emulator runs Cycle() at
+  // approximately 60 Hz for timing purposes. (In a real implementation, you’d
+  // separate timer updates into a 60 Hz loop, but let’s keep it simple for
+  // now.)
+  if (delayTimer > 0) {
+    // delayTimer: Used for game timing (e.g., Fx15 sets it, Fx07 reads it).
+    --delayTimer;
+  }
+
+  if (soundTimer > 0) {
+    // soundTimer: Triggers a beep when non-zero and decrements;
+    // it stops at zero.
+    --soundTimer;
+  }
 }
 
 // "this" keyword is a pointer to the current Chip8 object instance.

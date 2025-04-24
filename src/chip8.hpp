@@ -33,30 +33,46 @@ class Chip8 {
   typedef void (Chip8::*Chip8Func)();
   // 16 units array
   // from instructions that starts with $0 to $F(inclusive so +1).
-  Chip8Func table[0xF + 1];
-
+  Chip8Func table[0xF + 1] = {
+      &Chip8::Table0,   // 0x0
+      &Chip8::OP_1nnn,  // 0x1
+      &Chip8::OP_2nnn,  // 0x2
+      &Chip8::OP_3xkk,  // 0x3
+      &Chip8::OP_4xkk,  // 0x4
+      &Chip8::OP_5xy0,  // 0x5
+      &Chip8::OP_6xkk,  // 0x6
+      &Chip8::OP_7xkk,  // 0x7
+      &Chip8::Table8,   // 0x8
+      &Chip8::OP_9xy0,  // 0x9
+      &Chip8::OP_Annn,  // 0xA
+      &Chip8::OP_Bnnn,  // 0xB
+      &Chip8::OP_Cxkk,  // 0xC
+      &Chip8::OP_Dxyn,  // 0xD
+      &Chip8::TableE,   // 0xE
+      &Chip8::TableF    // 0xF
+  };
   // 15 units array.
   // for $00E0 & $00EE, only the fourth digit is unique,
   // therefore, 0x000E + 1 (inclusive of $00EE).
-  Chip8Func table0[0xE + 1];
+  Chip8Func table0[0xE + 1] = {};
 
   // 15 units array.
   // for those starts with $8xy, only the fourth digit is unique,
   // same principle as above, instructions goes to $8xyE.
   // therefore, 0x000E + 1 (inclusive of $8xyE).
-  Chip8Func table8[0xE + 1];
+  Chip8Func table8[0xE + 1] = {};
 
   // 15 units array.
   // for $Exa1 & $Ex9E, although last 2 digits are different,
   // these are the only 2 instructions that need to be dealt with.
   // So a table from 0x0 to 0xE + 1 is enough.
-  Chip8Func tableE[0xE + 1];
+  Chip8Func tableE[0xE + 1] = {};
 
   // 106 units array.
   // for those that start with $F and last 2 digits are unique.
   // $Fx goes from $Fx07 to $Fx65.
   // For the ease of indexing, the array size should be 0x00 to 0x65(inclusive).
-  Chip8Func tableF[0x65 + 1];
+  Chip8Func tableF[0x65 + 1] = {};
 
   // In the case of invalid opcodes are called (opcodes that don't exist),
   // it calls OP_NULL.
