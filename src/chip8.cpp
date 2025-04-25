@@ -1,5 +1,7 @@
 #include "chip8.hpp"
 
+#include <SDL3/SDL_keycode.h>
+
 #include <fstream>
 
 const unsigned int START_ADDRESS = 0x200;
@@ -189,13 +191,13 @@ void Chip8::OP_00E0() { memset(video, 0, sizeof(video)); }
 void Chip8::OP_00EE() {
   // Requires safety check for stack level below 0,
   // unsigned int wraparound if out of 0 to 255.
-  if (sp == 0) {
-    pc = stack[sp];  // Needs error handling.
-  } else {
-    // Move sp down.
-    sp--;
-    pc = stack[sp];
-  }
+  // if (sp == 0) {
+  //   pc = stack[sp];  // Needs error handling.
+  // } else {
+  //   // Move sp down.
+  sp--;
+  pc = stack[sp];
+  // }
 }
 
 // Jump to address nnn
@@ -673,15 +675,54 @@ void Chip8::OP_Fx07() {
 // The easiest way to “wait” is to decrement the PC by 2 whenever a keypad value
 // is not detected. This has the effect of running the same instruction
 // repeatedly.
+// void Chip8::OP_Fx0A() {
+//   uint8_t x = (opcode & 0x0F00u) >> 8u;
+//   // uint8_t key = registers[x];
+//   for (uint8_t i = 0; i < 16; i++) {
+//     if (keypad[i]) {
+//       registers[x] = i;
+//       pc += 2;
+//       break;
+//     }
+//     pc -= 2;
+//   }
+// }
 void Chip8::OP_Fx0A() {
-  uint8_t x = (opcode & 0x0F00u) >> 8u;
-  // uint8_t key = registers[x];
-  for (uint8_t i = 0; i < 16; i++) {
-    if (keypad[i]) {
-      registers[x] = i;
-      pc += 2;
-      break;
-    }
+  uint8_t Vx = (opcode & 0x0F00u) >> 8u;
+
+  if (keypad[0]) {
+    registers[Vx] = 0;
+  } else if (keypad[1]) {
+    registers[Vx] = 1;
+  } else if (keypad[2]) {
+    registers[Vx] = 2;
+  } else if (keypad[3]) {
+    registers[Vx] = 3;
+  } else if (keypad[4]) {
+    registers[Vx] = 4;
+  } else if (keypad[5]) {
+    registers[Vx] = 5;
+  } else if (keypad[6]) {
+    registers[Vx] = 6;
+  } else if (keypad[7]) {
+    registers[Vx] = 7;
+  } else if (keypad[8]) {
+    registers[Vx] = 8;
+  } else if (keypad[9]) {
+    registers[Vx] = 9;
+  } else if (keypad[10]) {
+    registers[Vx] = 10;
+  } else if (keypad[11]) {
+    registers[Vx] = 11;
+  } else if (keypad[12]) {
+    registers[Vx] = 12;
+  } else if (keypad[13]) {
+    registers[Vx] = 13;
+  } else if (keypad[14]) {
+    registers[Vx] = 14;
+  } else if (keypad[15]) {
+    registers[Vx] = 15;
+  } else {
     pc -= 2;
   }
 }
@@ -749,7 +790,7 @@ void Chip8::OP_Fx33() {
 void Chip8::OP_Fx55() {
   uint8_t x = (opcode & 0x0F00u) >> 8u;
 
-  for (uint8_t i = 0; i <= registers[x]; i++) {
+  for (uint8_t i = 0; i <= x; i++) {
     memory[index + i] = registers[i];
   }
 }
@@ -758,7 +799,7 @@ void Chip8::OP_Fx55() {
 void Chip8::OP_Fx65() {
   uint8_t x = (opcode & 0x0F00u) >> 8u;
 
-  for (uint8_t i = 0; i <= registers[x]; i++) {
+  for (uint8_t i = 0; i <= x; i++) {
     registers[i] = memory[index + i];
   }
 }
